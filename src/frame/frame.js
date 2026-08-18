@@ -49,7 +49,8 @@
   });
 
   // Set the final, always cross-origin URL before connecting the frame. The
-  // tab-scoped DNR rule is already live, so framing headers cannot win a race.
+  // extension-initiator DNR rule is already live, so framing headers cannot
+  // win a race.
   frame.src = url.href;
   document.body.append(frame);
 })();

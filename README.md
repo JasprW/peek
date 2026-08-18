@@ -317,9 +317,12 @@ boundary provides DOM isolation without forcing the target into an opaque
 origin. The wrapper only relays the tokened child bridge and target load
 signals. From a secure source page it also upgrades insecure redirects instead
 of letting Chromium reject them as mixed content; HTTP source pages keep HTTP
-targets unchanged. Sites can still fall back to a tab when browser-wide
-third-party-cookie policy blocks their session or they require particular
-framing metadata.
+targets unchanged. A short-lived DNR rule scoped to extension-initiated
+subframes removes `X-Frame-Options` and CSP `frame-ancestors` from the wrapper's
+target request; the existing tab-scoped rule covers later target-initiated
+navigations. Sites can still fall back to a tab when browser-wide
+third-party-cookie policy blocks their session or they require other framing
+metadata.
 
 **Warming on pointer-down.** The Peek is built and the document starts loading on
 mouse *down*, into a dialog that is `show()`n non-modally, fully transparent and

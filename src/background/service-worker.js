@@ -62,6 +62,18 @@ chrome.runtime.onInstalled.addListener(async () => {
  */
 
 const armed = new Set();
+// The first target request is initiated by src/frame/frame.html. Once that
+// wrapper keeps its real extension origin for authenticated cookies, a rule
+// scoped only by the source tab no longer sees every Chromium build's request.
+// This second rule is still narrow: extension initiator + subframes only, and
+// it exists only while at least one Peek is armed.
+const PEEK_WRAPPER_RULE_ID = 2147483639;
+
+const embedResponseHeaders = () => [
+  { header: "x-frame-options", operation: "remove" },
+  { header: "content-security-policy", operation: "remove" },
+  { header: "content-security-policy-report-only", operation: "remove" },
+];
 
 // Session rules outlive the worker; a restart means any peek that owned them
 // is long gone.
@@ -76,23 +88,33 @@ async function arm(tabId) {
   if (!tabId || armed.has(tabId)) return;
   armed.add(tabId);
   try {
-    await chrome.declarativeNetRequest.updateSessionRules({
-      removeRuleIds: [tabId],
-      addRules: [
-        {
-          id: tabId,
-          priority: 1,
-          action: {
-            type: "modifyHeaders",
-            responseHeaders: [
-              { header: "x-frame-options", operation: "remove" },
-              { header: "content-security-policy", operation: "remove" },
-              { header: "content-security-policy-report-only", operation: "remove" },
-            ],
-          },
-          condition: { tabIds: [tabId], resourceTypes: ["sub_frame"] },
+    const removeRuleIds = [tabId, PEEK_WRAPPER_RULE_ID];
+    const addRules = [
+      {
+        id: tabId,
+        priority: 1,
+        action: {
+          type: "modifyHeaders",
+          responseHeaders: embedResponseHeaders(),
         },
-      ],
+        condition: { tabIds: [tabId], resourceTypes: ["sub_frame"] },
+      },
+      {
+        id: PEEK_WRAPPER_RULE_ID,
+        priority: 1,
+        action: {
+          type: "modifyHeaders",
+          responseHeaders: embedResponseHeaders(),
+        },
+        condition: {
+          initiatorDomains: [chrome.runtime.id],
+          resourceTypes: ["sub_frame"],
+        },
+      },
+    ];
+    await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds,
+      addRules,
     });
   } catch (e) {
     armed.delete(tabId);
@@ -106,9 +128,13 @@ async function disarm(tabId) {
   // and the rule outliving the peek is exactly what must never happen. The
   // in-memory set is an optimisation for arm(), not the source of truth.
   try {
-    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] });
+    const removeRuleIds = [tabId];
+    if (!armed.size) removeRuleIds.push(PEEK_WRAPPER_RULE_ID);
+    await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds });
   } catch {}
 }
+
+chrome.tabs.onRemoved.addListener((tabId) => disarm(tabId));
 
 /* ─── Messages ────────────────────────────────────────────────────────── */
 
