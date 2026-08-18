@@ -651,14 +651,13 @@
       this.frame.className = "frame";
       this.frame.setAttribute("allow", "clipboard-write; fullscreen; picture-in-picture");
       this.frame.setAttribute("referrerpolicy", "no-referrer");
-      this.frame.setAttribute("sandbox", "allow-scripts");
       /*
-       * This extension-authored wrapper is sandboxed to an opaque origin. The
-       * target remains sandboxed one level down by an immutable response CSP,
-       * where it is always cross-origin from its direct parent.
-       * Keeping the wrapper opaque also lets the tab-scoped DNR rule apply to
-       * the target request; Chrome excludes extension-origin requests from it.
-       * See src/frame/frame.js.
+       * Keep the extension wrapper on its real chrome-extension:// origin.
+       * With host permission for the target, Chromium can then treat its
+       * request as same-site for cookies instead of forcing authenticated
+       * Jira, Confluence and similar pages into a fresh iframe session. The
+       * HTTP(S) target remains cross-origin from the wrapper. See
+       * src/frame/frame.js.
        */
 
       this.loader = document.createElement("div");

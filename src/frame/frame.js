@@ -3,8 +3,8 @@
  *
  * The host page must never be the target page's direct parent. This
  * extension-origin document stays between the two, so every HTTP(S) target is
- * cross-origin from its parent. The worker applies the target's sandbox as an
- * enforced response CSP, which page JavaScript cannot remove.
+ * cross-origin from its parent while requests retain the extension context
+ * needed for authenticated cookies on hosts the extension may access.
  *
  * It also relays the existing host ↔ child bridge without interpreting it.
  */
@@ -48,8 +48,8 @@
     window.parent.postMessage({ __peekFrame: "load", token }, "*");
   });
 
-  // Set the final, always cross-origin URL before connecting the frame. Its
-  // response receives the immutable sandbox CSP from the tab-scoped DNR rule.
+  // Set the final, always cross-origin URL before connecting the frame. The
+  // tab-scoped DNR rule is already live, so framing headers cannot win a race.
   frame.src = url.href;
   document.body.append(frame);
 })();
