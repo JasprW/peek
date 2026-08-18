@@ -57,11 +57,23 @@ chrome.runtime.onInstalled.addListener(async () => {
  * X-Frame-Options and CSP frame-ancestors exist to stop clickjacking, so we
  * suspend them as narrowly as the API allows: session-scoped rules, one tab,
  * sub_frame requests only, added when a peek is about to open and removed the
- * moment it closes. DNR can't rewrite a header value, only drop it, so the
- * whole CSP goes — which is why the rule's lifetime is kept this short.
+ * moment it closes. The site's CSP is replaced by the target sandbox policy,
+ * which also removes frame-ancestors without leaving the document unsandboxed.
  */
 
 const armed = new Set();
+
+// Deliver the target sandbox as an enforced response policy instead of an
+// iframe attribute. A page can remove an attribute when it is same-origin
+// with its embedder, and Chromium warns whenever allow-scripts and
+// allow-same-origin appear together there. A response CSP is immutable from
+// page JavaScript, so it keeps the useful site capabilities without either
+// the escape hatch or the console warning.
+const TARGET_SANDBOX_CSP =
+  "sandbox allow-same-origin allow-scripts allow-forms allow-modals " +
+  "allow-popups allow-popups-to-escape-sandbox allow-downloads " +
+  "allow-pointer-lock allow-presentation allow-orientation-lock " +
+  "allow-storage-access-by-user-activation";
 
 // Session rules outlive the worker; a restart means any peek that owned them
 // is long gone.
@@ -86,7 +98,11 @@ async function arm(tabId) {
             type: "modifyHeaders",
             responseHeaders: [
               { header: "x-frame-options", operation: "remove" },
-              { header: "content-security-policy", operation: "remove" },
+              {
+                header: "content-security-policy",
+                operation: "set",
+                value: TARGET_SANDBOX_CSP,
+              },
               { header: "content-security-policy-report-only", operation: "remove" },
             ],
           },

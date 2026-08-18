@@ -307,15 +307,17 @@ reports — which is what makes *back-at-root dismisses* possible, and what tell
 the side panel whether a page actually rendered or whether it's looking at
 Chromium's "refused to connect" document.
 
-**A wrapper makes the sandbox real.** A sandbox that grants both scripts and
-same-origin access can be removed by a same-origin child. The target therefore
-lives one level below an extension-origin wrapper, making every HTTP(S) target
-cross-origin from the document that owns its sandbox. The wrapper only relays
-the tokened child bridge and target load signals. From a secure source page it
-also upgrades insecure redirects instead of letting Chromium reject them as
-mixed content; HTTP source pages keep HTTP targets unchanged. The isolation
-means target requests carry no referrer and are classified cross-site, so a site
-that explicitly requires same-site framing metadata may fall back to a tab.
+**A wrapper makes the sandbox real.** The target lives one level below an
+extension-origin wrapper, making every HTTP(S) target cross-origin from its
+parent. The target's sandbox is delivered as an enforced response CSP instead
+of an iframe attribute, so page JavaScript cannot remove it and Chromium does
+not emit the `allow-scripts` + `allow-same-origin` escape warning. The wrapper
+only relays the tokened child bridge and target load signals. From a secure
+source page it also upgrades insecure redirects instead of letting Chromium
+reject them as mixed content; HTTP source pages keep HTTP targets unchanged.
+The isolation means target requests carry no referrer and are classified
+cross-site, so a site that explicitly requires same-site framing metadata may
+fall back to a tab.
 
 **Warming on pointer-down.** The Peek is built and the document starts loading on
 mouse *down*, into a dialog that is `show()`n non-modally, fully transparent and

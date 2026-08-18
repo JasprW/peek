@@ -1,11 +1,10 @@
 /**
  * Peek target-frame wrapper.
  *
- * The host page must never be the sandboxed page's direct parent: a same-origin
- * target with both allow-scripts and allow-same-origin could otherwise remove
- * its own sandbox attribute. This extension-origin document stays between the
- * two, so every http(s) target is cross-origin from its parent and the sandbox
- * cannot be escaped.
+ * The host page must never be the target page's direct parent. This
+ * extension-origin document stays between the two, so every HTTP(S) target is
+ * cross-origin from its parent. The worker applies the target's sandbox as an
+ * enforced response CSP, which page JavaScript cannot remove.
  *
  * It also relays the existing host ↔ child bridge without interpreting it.
  */
@@ -33,13 +32,6 @@
   const frame = document.createElement("iframe");
   frame.setAttribute("allow", "clipboard-write; fullscreen; picture-in-picture");
   frame.setAttribute("referrerpolicy", "no-referrer");
-  frame.setAttribute(
-    "sandbox",
-    "allow-same-origin allow-scripts allow-forms allow-modals " +
-      "allow-popups allow-popups-to-escape-sandbox allow-downloads " +
-      "allow-pointer-lock allow-presentation allow-orientation-lock " +
-      "allow-storage-access-by-user-activation"
-  );
 
   window.addEventListener("message", (event) => {
     const data = event.data;
@@ -56,9 +48,8 @@
     window.parent.postMessage({ __peekFrame: "load", token }, "*");
   });
 
-  // Set the final, always cross-origin URL before connecting the sandboxed
-  // frame. Chromium otherwise evaluates the initial same-origin about:blank
-  // document and reports the allow-scripts + allow-same-origin escape warning.
+  // Set the final, always cross-origin URL before connecting the frame. Its
+  // response receives the immutable sandbox CSP from the tab-scoped DNR rule.
   frame.src = url.href;
   document.body.append(frame);
 })();

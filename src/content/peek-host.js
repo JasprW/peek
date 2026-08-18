@@ -96,7 +96,7 @@
   const PEEKABLE = /^https?:$/;
 
   /**
-   * The header-stripping rule has to exist before the frame's request goes
+   * The framing rule has to exist before the frame's request goes
    * out, so every path that loads a peek waits on this. It's requested as
    * early as pointerdown, so by click time it's almost always already settled
    * and costs nothing.
@@ -654,8 +654,8 @@
       this.frame.setAttribute("sandbox", "allow-scripts");
       /*
        * This extension-authored wrapper is sandboxed to an opaque origin. The
-       * target remains sandboxed one level down, where it is always cross-origin
-       * from its direct parent and cannot remove its own sandbox attribute.
+       * target remains sandboxed one level down by an immutable response CSP,
+       * where it is always cross-origin from its direct parent.
        * Keeping the wrapper opaque also lets the tab-scoped DNR rule apply to
        * the target request; Chrome excludes extension-origin requests from it.
        * See src/frame/frame.js.
@@ -1681,7 +1681,7 @@
       // Capture is the only phase guaranteed to run — the page may stop this
       // event before the trigger below ever sees it. A peek primed on
       // pointerdown for a click that then went to the page is orphaned: it
-      // would hold a hidden document and the relaxed header rule until the
+      // would hold a hidden document and the temporary framing rule until the
       // 12s discard. This runs after the whole dispatch, so a click that did
       // open a peek has already set `current` and is left alone.
       if (primed) setTimeout(() => (current || !primed ? null : discardPrimed()), 0);
