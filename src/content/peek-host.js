@@ -274,13 +274,14 @@
    */
   const NO_COMMIT_GIVEUP_MS = 5000;
 
-  // Swipe-to-dismiss commit points, in panel pixels and px/ms. All are tested
-  // during the gesture rather than after it — see _wheel. A fling carries its
-  // own floor: however fast the flick, the panel has to have actually moved,
-  // or one sharp wheel tick would throw the peek away.
+  // Swipe-to-dismiss commit point in panel pixels. It is intentionally tested
+  // only after the wheel stream goes quiet: crossing the line while fingers
+  // are still down merely arms the action, so dragging back can always cancel
+  // it before release. A mouse's single horizontal wheel notch is not enough;
+  // _wheelEnd also requires more than one sample.
   const SWIPE_COMMIT_PX = 118;
-  const SWIPE_FLING_V = 0.9;
-  const SWIPE_FLING_MIN_PX = 46;
+  const SWIPE_RELEASE_IDLE_MS = 90;
+  const SWIPE_RELAYED_RELEASE_IDLE_MS = 200;
   // The pane is fully faded by ~2.7× the commit distance. Held as a ratio so
   // the fade keeps pace when sensitivity moves the threshold — otherwise a
   // twitchy setting would dismiss while the pane still looked barely touched.
@@ -974,61 +975,60 @@
       this.panel.style.opacity =
         String(this.drag.act === "dismiss" ? 1 - progress * 0.35 : 1);
 
-      // Commit the moment the gesture earns it, rather than when the events
-      // stop arriving. macOS keeps delivering momentum wheel events for a few
-      // hundred ms after the fingers lift, and every one of them pushed the
-      // decision further out — so the panel hung at the end of the swipe,
-      // already past the threshold, waiting for physics that had nothing left
-      // to say. Deciding here also means the exit inherits the speed the
-      // finger had instead of restarting from rest.
-      // Both commits require more than one event. A trackpad swipe is dozens
-      // of them; a mouse's horizontal tilt-wheel is exactly one, and a single
-      // notch arrives scaled to ~150px — enough, on its own, to clear the
-      // distance threshold and throw away a peek nobody meant to dismiss.
-      const travelled = this.drag.n > 1 && resisted > commitPx;
-      const flung =
-        this.drag.n > 2 &&
-        this.drag.v > SWIPE_FLING_V / sens &&
-        resisted > SWIPE_FLING_MIN_PX / sens;
-      if (travelled || flung) {
-        const velocity = this.drag.v;
-        const act = this.drag.act;
-        clearTimeout(this._dragT);
-        // Where the pane is, and how fast it is going, at the moment the
-        // gesture hands over. close() reads the live transform for this;
-        // promote's exit needs the number as well, to finish the travel
-        // instead of hauling the pane back across the screen.
-        this._exit = { x: resisted * dir * this.drag.sign, velocity };
-        this.drag = null;
-        this.panel.dataset.dragging = "0";
-        if (act === "promote") this.promote();
-        else this.close({ from: "swipe", velocity });
-        return;
-      }
-
       clearTimeout(this._dragT);
+      // WheelEvent exposes neither a trackpad touch-end nor Chromium's native
+      // momentum phase, so a short quiet window is the closest web-visible
+      // release signal. Until it expires this stays a purely visual preview:
+      // more events — including a reversal back under the threshold — remain
+      // free to change the outcome.
       // A relayed gesture is only as regular as the peeked page's main thread.
       // 90ms is right for events landing here directly; behind a busy page it
       // expires mid-swipe, springs the pane back to centre, and starts the
       // next event on a fresh drag that never accumulates enough to commit —
       // which is what a swipe that "doesn't work" over the pane looks like.
-      this._dragT = setTimeout(() => this._wheelEnd(), this.drag.relayed ? 200 : 90);
+      this._dragT = setTimeout(
+        () => this._wheelEnd(),
+        this.drag.relayed ? SWIPE_RELAYED_RELEASE_IDLE_MS : SWIPE_RELEASE_IDLE_MS
+      );
     }
 
-    /** Only ever the snap-back now — a committed swipe never reaches here. */
+    /** Settle the final offset once the wheel stream has gone quiet. */
     _wheelEnd() {
       if (!this.drag) return;
+      const drag = this.drag;
+      const commitPx = SWIPE_COMMIT_PX / sensitivity();
+      const resisted = Math.pow(drag.x, 0.86) * 1.6;
+      // Requiring two samples keeps a single mouse tilt-wheel notch from
+      // committing even when the browser reports that notch as ~150px.
+      const committed = drag.n > 1 && resisted >= commitPx;
+
       this.drag = null;
       this.panel.dataset.dragging = "0";
 
+      if (committed) {
+        // Offset alone chooses the outcome. Velocity only lets the accepted
+        // action continue in the direction it was already travelling; a last
+        // second reversal can never turn a below-threshold release into a
+        // fling commit.
+        const velocity = Math.max(0, drag.v);
+        this._exit = {
+          x: resisted * dismissSign() * drag.sign,
+          velocity,
+        };
+        if (drag.act === "promote") this.promote();
+        else this.close({ from: "swipe", velocity });
+        return;
+      }
+
       const S = getComputedStyle(this.root);
-      const spring = S.getPropertyValue("--spring").trim() || "ease-out";
+      const easeOut = S.getPropertyValue("--ease-out").trim() || "ease-out";
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
       const a = this.panel.animate(
         [
           { transform: this.panel.style.transform, opacity: this.panel.style.opacity },
           { transform: "none", opacity: 1 },
         ],
-        { duration: 420, easing: spring, fill: "none" }
+        { duration: reduce ? 100 : 220, easing: easeOut, fill: "none" }
       );
       a.finished
         .then(() => {
