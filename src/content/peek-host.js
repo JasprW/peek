@@ -1063,9 +1063,11 @@
       const committed = drag.n > 1 && resisted >= commitPx;
 
       this.drag = null;
-      this.panel.dataset.dragging = "0";
 
       if (committed) {
+        // Keep the ordinary rail hidden through the accepted exit. Letting it
+        // fade back in here briefly duplicates the fixed action cue before the
+        // pane disappears; teardown removes both together.
         // Offset alone chooses the outcome. Velocity only lets the accepted
         // action continue in the direction it was already travelling; a last
         // second reversal can never turn a below-threshold release into a
@@ -1080,6 +1082,8 @@
         return;
       }
 
+      // A cancelled gesture restores the normal controls with the pane.
+      this.panel.dataset.dragging = "0";
       this._clearSwipeCue();
 
       const S = getComputedStyle(this.root);
@@ -1189,6 +1193,7 @@
         this._morphAnim?.cancel();
       } catch {}
       this.state = "open";
+      this.panel.dataset.dragging = "0";
       this.panel.style.transform = "";
       this.panel.style.opacity = "";
       this.panel.style.transformOrigin = "";
