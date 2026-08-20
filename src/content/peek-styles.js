@@ -215,6 +215,7 @@ dialog::backdrop {
   flex-direction: column;
   gap: 13px;
   z-index: 2;
+  transition: opacity 100ms linear;
 }
 
 .orb {
@@ -241,6 +242,46 @@ dialog::backdrop {
   box-shadow: var(--orb-shadow), 0 0 0 2px var(--ink);
 }
 .root[data-reduced-effects="1"] .orb {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* The rail can leave the viewport with the pane, so the commit target lives
+   on the newly revealed side of the scrim. It is absent at rest, becomes just
+   legible as intent develops, and inverts only when releasing will commit. */
+.swipe-cue {
+  position: fixed;
+  top: 50%;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--orb-bg);
+  color: var(--orb-fg);
+  box-shadow: var(--orb-shadow), inset 0 0 0 0.5px var(--orb-ring);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  opacity: var(--swipe-cue-opacity, 0);
+  transform: translateY(-50%) scale(var(--swipe-cue-scale, 0.92));
+  transition: background-color 100ms linear, color 100ms linear,
+    box-shadow 100ms linear;
+  pointer-events: none;
+}
+.swipe-cue[data-side="left"] { left: 26px; }
+.swipe-cue[data-side="right"] { right: 26px; }
+.swipe-cue span { display: none; }
+.swipe-cue span svg { width: 16px; height: 16px; display: block; }
+.swipe-cue[data-action="dismiss"] span[data-act="dismiss"],
+.swipe-cue[data-action="promote"] span[data-act="promote"] { display: block; }
+.swipe-cue[data-active="1"][data-armed="1"] {
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: var(--orb-shadow), inset 0 0 0 1px var(--ink);
+  opacity: 1;
+  transform: translateY(-50%) scale(1.04);
+}
+.root[data-reduced-effects="1"] .swipe-cue {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
@@ -388,6 +429,7 @@ dialog::backdrop {
 /* ── Drag ───────────────────────────────────────────────────────────────── */
 .panel[data-dragging="1"] { transition: none; }
 .panel[data-dragging="1"] .frame { pointer-events: none; }
+.panel[data-dragging="1"] .rail { opacity: 0; pointer-events: none; }
 
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
@@ -396,5 +438,8 @@ dialog::backdrop {
   .loader .spinner { animation-duration: 1.6s; }
   .orb { transition: background-color 120ms linear; }
   .orb:hover, .orb:active { transform: none; }
+  .rail { transition: none; }
+  .swipe-cue,
+  .swipe-cue[data-active="1"][data-armed="1"] { transform: translateY(-50%); }
 }
 `;
