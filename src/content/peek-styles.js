@@ -57,6 +57,7 @@ globalThis.__PEEK__.CSS = /* css */ `
   --radius: 12px;
   --orb: 30px;
   --rail-gap: 16px;
+  --swipe-cue-edge: clamp(36px, 3vw, 48px);
 
   /* Motion — spring curve solved from stiffness 260 / damping 26 / mass 1.
      ~1.4% overshoot: enough to feel physical, never enough to look bouncy. */
@@ -268,8 +269,8 @@ dialog::backdrop {
     box-shadow 100ms linear;
   pointer-events: none;
 }
-.swipe-cue[data-side="left"] { left: 26px; }
-.swipe-cue[data-side="right"] { right: 26px; }
+.swipe-cue[data-side="left"] { left: var(--swipe-cue-edge); }
+.swipe-cue[data-side="right"] { right: var(--swipe-cue-edge); }
 .swipe-cue span { display: none; }
 .swipe-cue span svg { width: 16px; height: 16px; display: block; }
 .swipe-cue[data-action="dismiss"] span[data-act="dismiss"],
