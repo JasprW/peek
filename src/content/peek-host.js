@@ -282,10 +282,11 @@
   const SWIPE_COMMIT_PX = 118;
   const SWIPE_RELEASE_IDLE_MS = 90;
   const SWIPE_RELAYED_RELEASE_IDLE_MS = 200;
-  // The pane is fully faded by ~2.7× the commit distance. Held as a ratio so
-  // the fade keeps pace when sensitivity moves the threshold — otherwise a
-  // twitchy setting would dismiss while the pane still looked barely touched.
-  const SWIPE_FADE_RATIO = 320 / SWIPE_COMMIT_PX;
+  // Feedback keeps changing briefly beyond the commit point, then caps before
+  // either action becomes visually extreme while the gesture is still live.
+  const SWIPE_FEEDBACK_RANGE = 1.5;
+  const SWIPE_SCALE_DELTA = 0.04;
+  const SWIPE_DISMISS_FADE = 0.45;
 
   /** Higher is twitchier: it divides every threshold, it doesn't scale motion. */
   const sensitivity = () => {
@@ -942,6 +943,7 @@
           v: 0,
           n: 0,
           act,
+          reduce: matchMedia("(prefers-reduced-motion: reduce)").matches,
           sign: opposite ? -1 : 1, // maps the gesture's own direction onto +travel
         };
         this.panel.dataset.dragging = "1";
@@ -966,14 +968,19 @@
       const commitPx = SWIPE_COMMIT_PX / sens;
 
       const resisted = Math.pow(this.drag.x, 0.86) * 1.6;
-      const progress = clamp(resisted / (commitPx * SWIPE_FADE_RATIO), 0, 1);
+      const feedback = clamp(resisted / (commitPx * SWIPE_FEEDBACK_RANGE), 0, 1);
+      const promote = this.drag.act === "promote";
+      // Dismiss recedes and fades because the content is leaving. Promote
+      // grows without fading because the same content is becoming persistent.
+      // Both derive from the current offset, so reversing the drag reverses
+      // the feedback exactly rather than playing a separate animation.
+      const scale = this.drag.reduce
+        ? 1
+        : 1 + feedback * SWIPE_SCALE_DELTA * (promote ? 1 : -1);
       this.panel.style.transform =
-        `translateX(${resisted * dir * this.drag.sign}px) scale(${1 - progress * 0.03})`;
-      // A dismissal is on its way out of existence, so it fades as it goes.
-      // The other two are on their way to becoming something you keep — a
-      // panel or a tab — so they don't.
+        `translateX(${resisted * dir * this.drag.sign}px) scale(${scale})`;
       this.panel.style.opacity =
-        String(this.drag.act === "dismiss" ? 1 - progress * 0.35 : 1);
+        String(promote ? 1 : 1 - feedback * SWIPE_DISMISS_FADE);
 
       clearTimeout(this._dragT);
       // WheelEvent exposes neither a trackpad touch-end nor Chromium's native
